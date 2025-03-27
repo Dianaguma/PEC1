@@ -2,18 +2,37 @@
 title: "PEC 1 Diana_Gutiérrez"
 author: "Diana Gutierrez Martínez"
 date: "2025-03-26"
-output: pdf_document
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
 ---
 
 # Instalar y cargar los paquetes necesarios
 
 ```{r}
 # Cargar las librerías necesarias
+
+install.packages("usethis")
+
+library(usethis)
+
+use_git_remote(url = "https://github.com/Dianaguma/PEC1", overwrite = TRUE)
+
+
+chooseCRANmirror(graphics = FALSE, ind = 1)
+
+install.packages("BiocManager")
+BiocManager::install("SummarizedExperiment")
+
+install.packages("readr")
+
 library(SummarizedExperiment)
 library(readr)
 
 # Leer el archivo CSV
-data <- read_csv("C:\\Users\\merma\\OneDrive\\Escritorio\\MASTER BIOINFORMATICA\\analisis de datos omicos\\human_cachexia.csv")
+data <- read_csv("C:\\Users\\merma\\OneDrive\\Escritorio\\MASTER BIOINFORMATICA\\analisis de datos omicos\\PEC1\\human_cachexia.csv")
 
 # Visualizar los primeros registros
 View(data)
@@ -21,62 +40,84 @@ View(data)
 # Separar los metadatos (por ejemplo, Patient ID y Muscle loss)
 sample_data <- data[, c("Patient ID", "Muscle loss")]
 
- summary(sample_data)
- 
-sample_data$`Muscle loss` <- factor(sample_data$`Muscle loss`)
+# Reemplazar espacios en los nombres de las columnas por guiones bajos
+colnames(sample_data) <- gsub(" ", "_", colnames(sample_data))
+
+# Convertir "Muscle_loss" en factor
+sample_data$Muscle_loss <- factor(sample_data$Muscle_loss)
+
+# Verificar si hay NA en los metadatos
+sample_data <- sample_data[!is.na(sample_data$Patient_ID), ]  # Eliminar filas sin Patient_ID
+sample_data <- sample_data[!is.na(sample_data$Muscle_loss), ]  # Eliminar filas sin Muscle_loss
 
 # Separar los datos experimentales (mediciones de metabolitos)
-
 exp_data <- data[, -(1:2)]  # Eliminamos las primeras dos columnas (metadatos)
 
-# Ver los primeros registros de ambos
-head(sample_data)  # Metadatos
-head(exp_data)     # Datos experimentales
-
-# Convertir los datos experimentales en una matriz
+# Convertir los datos experimentales a matriz
 data_matrix <- as.matrix(exp_data)
 
+# Ajustar data_matrix al número de pacientes restantes en sample_data
 data_matrix <- data_matrix[1:nrow(sample_data), ]
 
-dim(data_matrix)
-
-rownames(data_matrix) <- sample_data$`Patient ID`
-
-head(data_matrix)
-
-dim(data_matrix)  # Ahora debería ser (63, 63), si cada paciente tiene una fila de datos experimentales.
-nrow(sample_data)  # Debería ser 63
-
-
-# Establecer los nombres de las filas como los IDs de los pacientes (de la columna "Patient ID")
-rownames(data_matrix) <- sample_data$`Patient ID`
-
-# Establecer los nombres de las columnas como los nombres de los metabolitos
+# Establecer nombres de filas y columnas en la matriz
+rownames(data_matrix) <- sample_data$Patient_ID
 colnames(data_matrix) <- colnames(exp_data)
 
-# Ver la matriz de datos experimentales
-head(data_matrix)
+# Verificar duplicados en Patient_ID
+duplicated_IDs <- anyDuplicated(sample_data$Patient_ID)
 
-# Verificar que la dimensión de los datos y los metadatos coincidan
-nrow(sample_data)  # Número de filas en los metadatos
-ncol(data_matrix)  # Número de columnas en los datos experimentales
+# Si hay duplicados, elimina las filas duplicadas
+if (duplicated_IDs > 0) {
+  sample_data <- sample_data[!duplicated(sample_data$Patient_ID), ]
+  data_matrix <- data_matrix[rownames(data_matrix) %in% sample_data$Patient_ID, ]
+}
 
-# Asegúrate de que sample_data tenga el mismo número de filas que las columnas en data_matrix
-sample_data <- sample_data[1:ncol(data_matrix), ]
-
-# Verificar las dimensiones de ambos
-nrow(sample_data)
-ncol(data_matrix)
+# Verificar que las dimensiones coincidan
+if (nrow(data_matrix) != nrow(sample_data)) {
+  stop("El número de filas en la matriz de datos y en los metadatos no coincide")
+}
 
 # Crear el objeto SummarizedExperiment
 se <- SummarizedExperiment(
-  assays = list(counts = data_matrix),   # Datos experimentales
-  colData = sample_data,                 # Metadatos de las muestras
-  rowData = DataFrame(MuscleLoss = sample_data$`Muscle loss`)  # Metadatos de las filas (muestras)
+  assays = list(counts = data_matrix),
+  colData = sample_data
 )
 
 # Ver el objeto SummarizedExperiment
 se
 
-```
+# 3. Llevad a cabo un análisis exploratorio que os proporcione una visión general del dataset en la línea de lo que hemos visto en las actividades de este reto
 
+install.packages("ggplot2")     # Para visualización
+install.packages("dplyr")       # Para manipulación de datos
+install.packages("patchwork")   # Para combinar gráficos
+install.packages("GGally")      # Para análisis de correlación
+
+# Cargar librerías necesarias
+library(ggplot2)
+library(tidyr)
+
+# Calcular la correlación entre los metabolitos
+cor_matrix <- cor(data_matrix, use = "pairwise.complete.obs")
+
+# Visualizar la matriz de correlación
+library(reshape2)
+
+# Convertir la matriz de correlación a formato largo
+cor_data <- melt(cor_matrix)
+
+# Mapa de calor de la correlación entre metabolitos
+ggplot(cor_data, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "red", mid = "white", 
+                       midpoint = 0, limit = c(-1, 1), space = "Lab", 
+                       name = "Correlación") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   hjust = 1)) +
+  labs(title = "Mapa de calor de la correlación entre metabolitos",
+       x = "Metabolito", 
+       y = "Metabolito")
+
+
+```
