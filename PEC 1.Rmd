@@ -1,0 +1,82 @@
+---
+title: "PEC 1 Diana_Gutiérrez"
+author: "Diana Gutierrez Martínez"
+date: "2025-03-26"
+output: pdf_document
+---
+
+# Instalar y cargar los paquetes necesarios
+
+```{r}
+# Cargar las librerías necesarias
+library(SummarizedExperiment)
+library(readr)
+
+# Leer el archivo CSV
+data <- read_csv("C:\\Users\\merma\\OneDrive\\Escritorio\\MASTER BIOINFORMATICA\\analisis de datos omicos\\human_cachexia.csv")
+
+# Visualizar los primeros registros
+View(data)
+
+# Separar los metadatos (por ejemplo, Patient ID y Muscle loss)
+sample_data <- data[, c("Patient ID", "Muscle loss")]
+
+ summary(sample_data)
+ 
+sample_data$`Muscle loss` <- factor(sample_data$`Muscle loss`)
+
+# Separar los datos experimentales (mediciones de metabolitos)
+
+exp_data <- data[, -(1:2)]  # Eliminamos las primeras dos columnas (metadatos)
+
+# Ver los primeros registros de ambos
+head(sample_data)  # Metadatos
+head(exp_data)     # Datos experimentales
+
+# Convertir los datos experimentales en una matriz
+data_matrix <- as.matrix(exp_data)
+
+data_matrix <- data_matrix[1:nrow(sample_data), ]
+
+dim(data_matrix)
+
+rownames(data_matrix) <- sample_data$`Patient ID`
+
+head(data_matrix)
+
+dim(data_matrix)  # Ahora debería ser (63, 63), si cada paciente tiene una fila de datos experimentales.
+nrow(sample_data)  # Debería ser 63
+
+
+# Establecer los nombres de las filas como los IDs de los pacientes (de la columna "Patient ID")
+rownames(data_matrix) <- sample_data$`Patient ID`
+
+# Establecer los nombres de las columnas como los nombres de los metabolitos
+colnames(data_matrix) <- colnames(exp_data)
+
+# Ver la matriz de datos experimentales
+head(data_matrix)
+
+# Verificar que la dimensión de los datos y los metadatos coincidan
+nrow(sample_data)  # Número de filas en los metadatos
+ncol(data_matrix)  # Número de columnas en los datos experimentales
+
+# Asegúrate de que sample_data tenga el mismo número de filas que las columnas en data_matrix
+sample_data <- sample_data[1:ncol(data_matrix), ]
+
+# Verificar las dimensiones de ambos
+nrow(sample_data)
+ncol(data_matrix)
+
+# Crear el objeto SummarizedExperiment
+se <- SummarizedExperiment(
+  assays = list(counts = data_matrix),   # Datos experimentales
+  colData = sample_data,                 # Metadatos de las muestras
+  rowData = DataFrame(MuscleLoss = sample_data$`Muscle loss`)  # Metadatos de las filas (muestras)
+)
+
+# Ver el objeto SummarizedExperiment
+se
+
+```
+
